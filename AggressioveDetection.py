@@ -1,83 +1,20 @@
-"""
-顔認識、本人識別モデルの作成、本人以外の場合殺意があるかどうかの判別を行うクラス・関数モジュール
-"""
-# dnn用
+'''
+認識された人物が攻撃的かどうかを判別するためのクラスを持つ
+'''
 
-# その他パッケージ
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import os
 import glob
-from scipy import spatial
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
 
 # モデル作成用
 from keras.models import Sequential
 from keras.layers.convolutional import MaxPooling2D
 from keras.layers import Activation, Conv2D, Flatten, Dense,Dropout
 from keras.models import model_from_json
-from keras_facenet import FaceNet
 
-'''
-変数の定義
-'''
 current_dir = os.getcwd().replace(os.sep,'/') + '/' # pyファイル配下までのパスを取得
-
-# ネットワークと学習済みモデルをロードする
-# !wget -N https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.face_prototxt
-# !wget -N https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel
-face_prototxt = current_dir + 'model/face_detection/deploy.face_prototxt'
-face_model = current_dir + 'model/face_detection/res10_300x300_ssd_iter_140000.caffemodel'
-assert os.path.isfile(face_prototxt) or os.path.isfile(face_model), '顔認識モデルがない'
-face_net = cv2.dnn.readNetFromCaffe(face_prototxt, face_model) # 顔エリア判別用モデル → これでカメラに顔が移っているのか判断する
-
-"""
-クラスに依存しない関数の定義
-"""
-
-def triming_img(img_path, des_path):  # 顔検出して顔の部分だけを切り取る関数を作成
-
-  print("トリミング実施！")
-
-  files = glob.glob(img_path + "/*.jpg")
-  surfix = '.jpg'
-  for i, file in enumerate(files):
-    # 幅400画素になるようにリサイズする
-    img = cv2.imread(file)
-    img = cv2.resize(img, width=250, height=250)
-    (h, w) = img.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
-
-    # 物体検出器にblobを適用する
-    face_net.setInput(blob)
-    detections = face_net.forward()
-
-    # 顔部分の身を検出しトリミング
-    startX = 0
-    startY = 0
-    endX = 0
-    endY = 0
-    for me in range(0, detections.shape[2]):
-
-      # ネットワークが出力したconfidenceの値を抽出する
-      confidence = detections[0, 0, me, 2]
-
-      # confidenceの値が0.5以上の領域のみを検出結果として描画する
-      if confidence > 0.5:
-          # 対象領域のバウンディングボックスの座標を計算する
-          box = detections[0, 0, me, 3:7] * np.array([w, h, w, h])
-          (startX, startY, endX, endY) = box.astype("int")
-          # バウンディングボックスとconfidenceの値を描画する
-          print(startX, startY, endX, endY)
-          break
-
-    # トリミングの実施
-    tmpImg = img[startY:endY, startX:endX]
-    cv2.imwrite(des_path+str(i)+surfix, tmpImg)
-
-  print("トリミング完了！")
 
 class AggressioveDetection():
   '''
@@ -195,45 +132,3 @@ class AggressioveDetection():
       # train_y = np_utils.to_categorical(train_y, dense_size) # indexに応じてone-hot ベクトルに変換している。ラベル1の場合→[0,1,0,0,0]となる(カテゴリ数5の場合)
 
       # return train_X, train_y
-
-class MyselfDetection():
-  '''
-  自分自身を識別するためのモデルを作成
-  ユークリッド距離のしきい値にて自分か判断する
-  '''
-  # 顔認証用モデル
-  self_img = current_dir + 'data/myself'
-  embeddings = [] # 顔ベクトル（顔特徴量）
-  
-  def __init__(self, K=1) -> None:
-    self.embedder = FaceNet() # FaceNetモデル
-    self.K = K # クラスタ数
-    
-  def make_embedder(self):
-    # 顔データの読み込み
-    faces = []
-    files = glob.glob(self.self_img + "/*.jpg")
-    for file in files:
-      img = cv2.imread(file) # 画像読み込み
-      faces.append(img)
-    
-    embedding = self.embedder.embeddings([face for face in faces]) # 潜在変数表現に変換
-    self.embeddings.append(embedding[0]) # 顔ベクトルを保存
-    
-  def show_graph(self):
-    '''
-    ベクトルが正しくとれているかプロットする
-    '''
-    kmeans = KMeans(n_clusters=self.K).fit(self.embeddings) # 圧縮前にクラスタリングしておく
-    pred_label = kmeans.predict(self.embeddings)
-
-    pca = PCA(n_components=2)
-    pca.fit(self.embeddings) # 2次元にしてグラフにプロットできるようにする
-    reduced_embeddings = pca.fit_transform(self.embeddings)
-    
-    x = reduced_embeddings[:, 0]
-    y = reduced_embeddings[:, 1]
-    plt.scatter(x, y)
-    plt.legend()
-    plt.show()
-    print(pred_label)
