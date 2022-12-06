@@ -1,19 +1,47 @@
 import cv2
 import os
 import MyselfRecognition as mr
+import time
+import pyautogui
 
 
-obj = mr.MyselfDetection()
-
-def main():
-  # main関数
-  run_video()
+detector = mr.MyselfDetection()
+os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.2/bin")
+capture = cv2.VideoCapture(0) # VideoCapture オブジェクトを取得します
+# 動画ファイル保存用の設定
+fps = int(capture.get(cv2.CAP_PROP_FPS))                    # カメラのFPSを取得
+w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))              # カメラの横幅を取得
+h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))             # カメラの縦幅を取得
+fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')        # 動画保存時のfourcc設定（mp4用）
+video = cv2.VideoWriter('video.mp4', fourcc, fps, (w, h))  # 動画の仕様（ファイル名、fourcc, FPS, サイズ）
 
 def run_video():
   while(True):
-    capture = cv2.VideoCapture(0) # VideoCapture オブジェクトを取得します
-    ret, frame = capture.read()
-    wall_paper()
+    # ret, frame = capture.read() # フレームを取得
+    # cv2.imshow('Video', frame)
+    frame = cv2.imread('check2.jpg')
+    
+    detected_flg = detector.find_faces(frame) # TODO: 並行処理をさせて早くする
+    detected_flg = True
+    if detected_flg:
+      detector.make_embedder() # 動画に映った顔のベクトルを取得
+      unlock_flg = detector.Is_Me()
+      if not unlock_flg:
+        print("ロックします。")
+        wall_paper()
+        # TODO pyatutoguiで自由に動けなくする
+      else:
+        print("ロックを解除します")
+        cv2.destroyWindow('screen')
+    else:
+      wall_paper()
+    
+    # キー操作があればwhileループを抜ける
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+    time.sleep(2)
+  
+  close_video(capture)
 
 def close_video(capture):
   capture.release()
@@ -24,8 +52,7 @@ def wall_paper():
   cv2.namedWindow('screen', cv2.WINDOW_NORMAL)
   cv2.setWindowProperty('screen', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
   cv2.imshow('screen', img)
-  cv2.waitKey(1000)
-
 
 if __name__ == "__main__":
-  main()
+  run_video()
+  

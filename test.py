@@ -1,3 +1,4 @@
-from tensorflow.python.client import device_lib
-
-device_lib.list_local_devices()
+str = None
+import cv2
+frame = cv2.imread('check2.jpg')
+print()
